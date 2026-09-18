@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import asdict, dataclass
+from math import sqrt
 import re
 import unicodedata
 
@@ -195,3 +196,54 @@ def run_pipeline(text: str, options: PipelineOptions) -> PipelineResult:
         reduction_percent=round(reduction, 2),
         frequencies=dict(Counter(final_tokens).most_common()),
     )
+
+
+def split_documents(text: str) -> list[str]:
+    """Treat non-empty lines, or sentences on a single line, as mini documents."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) > 1:
+        return lines
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text.strip()) if part.strip()]
+
+
+def build_inverted_index(documents: list[str], options: PipelineOptions) -> dict[str, list[int]]:
+    """Map every processed term to the one-based document IDs containing it."""
+    index: dict[str, list[int]] = {}
+    for document_id, document in enumerate(documents, start=1):
+        for token in sorted(set(run_pipeline(document, options).final_tokens)):
+            index.setdefault(token, []).append(document_id)
+    return dict(sorted(index.items()))
+
+
+def search_documents(
+    query: str,
+    documents: list[str],
+    options: PipelineOptions,
+) -> list[dict[str, object]]:
+    """Rank documents with cosine similarity after applying the same pipeline."""
+    query_tokens = run_pipeline(query, options).final_tokens
+    query_counts = Counter(query_tokens)
+    query_norm = sqrt(sum(value * value for value in query_counts.values()))
+    rows = []
+
+    for document_id, document in enumerate(documents, start=1):
+        document_tokens = run_pipeline(document, options).final_tokens
+        document_counts = Counter(document_tokens)
+        document_norm = sqrt(sum(value * value for value in document_counts.values()))
+        dot_product = sum(
+            query_counts[token] * document_counts.get(token, 0)
+            for token in query_counts
+        )
+        denominator = query_norm * document_norm
+        score = dot_product / denominator if denominator else 0.0
+        matched_terms = sorted(set(query_counts).intersection(document_counts))
+        rows.append(
+            {
+                "Document": f"D{document_id}",
+                "Similarity": round(score, 4),
+                "Matched Terms": ", ".join(matched_terms) or "—",
+                "Text": document,
+            }
+        )
+
+    return sorted(rows, key=lambda row: (-float(row["Similarity"]), str(row["Document"])))

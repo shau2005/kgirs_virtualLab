@@ -24,6 +24,8 @@ The simulator uses a compact pipeline graph and requires no Neo4j implementation
 - Compare stemming, lemmatization, and no word-form reduction
 - Inspect every intermediate representation
 - View token metrics and a frequency chart
+- Build and inspect a real inverted search index
+- Compare document-query similarity before and after preprocessing
 - Download the cleaned corpus and trial log
 - Record multiple experimental trials
 - Complete a self-grading conceptual quiz

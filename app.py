@@ -10,7 +10,14 @@ import plotly.graph_objects as go
 import streamlit as st
 from fpdf import FPDF
 
-from core import DEFAULT_TEXT, PipelineOptions, run_pipeline
+from core import (
+    DEFAULT_TEXT,
+    PipelineOptions,
+    build_inverted_index,
+    run_pipeline,
+    search_documents,
+    split_documents,
+)
 
 
 EXPERIMENT = {
@@ -392,6 +399,102 @@ def render_simulation_section() -> None:
             margin={"l": 20, "r": 20, "t": 50, "b": 20},
         )
         st.plotly_chart(frequency_figure, width="stretch")
+
+    st.divider()
+    st.subheader("Real-World Use: Search Indexing Demonstration")
+    st.write(
+        "Search engines preprocess both stored documents and the user's query. This demonstration "
+        "treats each sentence (or each non-empty line) as a document, builds a small inverted index, "
+        "and shows how normalization improves matching between different word forms."
+    )
+    search_query = st.text_input(
+        "Search query",
+        value="connect entities and index documents",
+        help="Try changing ‘connect’ to ‘connecting’ or ‘indexed’ and compare the scores.",
+    )
+    documents = split_documents(raw_text)
+    raw_search_options = PipelineOptions(
+        lowercase=True,
+        expand_contractions=False,
+        remove_accents=False,
+        remove_punctuation=False,
+        remove_numbers=False,
+        remove_stopwords=False,
+        morphology="None",
+    )
+    raw_rankings = search_documents(search_query, documents, raw_search_options)
+    processed_rankings = search_documents(search_query, documents, options)
+    raw_by_document = {row["Document"]: row for row in raw_rankings}
+    processed_by_document = {row["Document"]: row for row in processed_rankings}
+
+    comparison_rows = []
+    for document_id, document in enumerate(documents, start=1):
+        key = f"D{document_id}"
+        comparison_rows.append(
+            {
+                "Document": key,
+                "Raw Similarity": raw_by_document[key]["Similarity"],
+                "Processed Similarity": processed_by_document[key]["Similarity"],
+                "Processed Matches": processed_by_document[key]["Matched Terms"],
+                "Text": document,
+            }
+        )
+    comparison_dataframe = pd.DataFrame(comparison_rows)
+
+    index_data = build_inverted_index(documents, options)
+    raw_vocabulary = build_inverted_index(documents, raw_search_options)
+    search_metric_1, search_metric_2, search_metric_3 = st.columns(3)
+    search_metric_1.metric("Indexed documents", len(documents))
+    search_metric_2.metric("Raw vocabulary", len(raw_vocabulary))
+    search_metric_3.metric(
+        "Processed vocabulary",
+        len(index_data),
+        delta=len(index_data) - len(raw_vocabulary),
+        delta_color="inverse",
+    )
+
+    st.dataframe(
+        comparison_dataframe.sort_values("Processed Similarity", ascending=False),
+        hide_index=True,
+        width="stretch",
+    )
+    comparison_figure = go.Figure()
+    comparison_figure.add_trace(
+        go.Bar(
+            name="Raw text",
+            x=comparison_dataframe["Document"],
+            y=comparison_dataframe["Raw Similarity"],
+            marker_color="#94a3b8",
+        )
+    )
+    comparison_figure.add_trace(
+        go.Bar(
+            name="After preprocessing",
+            x=comparison_dataframe["Document"],
+            y=comparison_dataframe["Processed Similarity"],
+            marker_color="#16a34a",
+        )
+    )
+    comparison_figure.update_layout(
+        title="Search Similarity: Raw vs Preprocessed Text",
+        xaxis_title="Document",
+        yaxis_title="Cosine similarity",
+        barmode="group",
+        height=340,
+        margin={"l": 20, "r": 20, "t": 50, "b": 20},
+    )
+    st.plotly_chart(comparison_figure, width="stretch")
+
+    with st.expander("Inspect the Generated Inverted Index"):
+        index_rows = [
+            {"Term": term, "Appears in Documents": ", ".join(f"D{doc_id}" for doc_id in document_ids)}
+            for term, document_ids in index_data.items()
+        ]
+        st.dataframe(pd.DataFrame(index_rows), hide_index=True, width="stretch")
+        st.caption(
+            "An inverted index is the core lookup structure used by many information-retrieval systems: "
+            "each term points to the documents in which it occurs."
+        )
 
     st.download_button(
         "Download Clean Corpus (.txt)",
