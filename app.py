@@ -509,6 +509,16 @@ def render_simulation_section() -> None:
     log_column, clear_column = st.columns(2)
     with log_column:
         if st.button("Record Current Trial", type="primary", width="stretch"):
+            best_processed_result = processed_rankings[0] if processed_rankings else None
+            best_document = best_processed_result["Document"] if best_processed_result else "—"
+            processed_similarity = (
+                float(best_processed_result["Similarity"]) if best_processed_result else 0.0
+            )
+            raw_similarity = (
+                float(raw_by_document[best_document]["Similarity"])
+                if best_document in raw_by_document
+                else 0.0
+            )
             trial = {
                 "Trial #": len(st.session_state["trials"]) + 1,
                 "Timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -517,6 +527,12 @@ def render_simulation_section() -> None:
                 "Final Tokens": result.final_token_count,
                 "Vocabulary": result.vocabulary_size,
                 "Reduction (%)": result.reduction_percent,
+                "Indexed Documents": len(documents),
+                "Raw Vocabulary": len(raw_vocabulary),
+                "Processed Vocabulary": len(index_data),
+                "Top Search Result": best_document,
+                "Raw Similarity": round(raw_similarity, 4),
+                "Processed Similarity": round(processed_similarity, 4),
                 "Clean Corpus": result.output_text,
             }
             st.session_state["trials"].append(trial)
@@ -591,6 +607,99 @@ def render_quiz_section() -> None:
         )
 
 
+def build_trial_analysis(trials: list[dict]) -> tuple[list[str], str]:
+    """Create evidence-based analysis and a conclusion from recorded trials."""
+    if not trials:
+        return (
+            ["No experimental trials were recorded; perform at least two trials for comparison."],
+            "The experiment cannot be concluded until preprocessing trials are recorded.",
+        )
+
+    best_reduction = max(trials, key=lambda trial: float(trial.get("Reduction (%)", 0)))
+    smallest_vocabulary = min(trials, key=lambda trial: int(trial.get("Vocabulary", 0)))
+    configurations = {str(trial.get("Configuration", "")) for trial in trials}
+    analysis = [
+        f"{len(trials)} trial(s) were performed using {len(configurations)} distinct preprocessing configuration(s).",
+        (
+            f"Trial {best_reduction.get('Trial #', '—')} achieved the highest token reduction: "
+            f"{best_reduction.get('Input Tokens', 0)} input tokens became "
+            f"{best_reduction.get('Final Tokens', 0)} final tokens "
+            f"({float(best_reduction.get('Reduction (%)', 0)):.2f}% reduction)."
+        ),
+        (
+            f"The smallest final vocabulary was {smallest_vocabulary.get('Vocabulary', 0)} terms "
+            f"in Trial {smallest_vocabulary.get('Trial #', '—')}, showing how normalization can "
+            "combine word variants and reduce index size."
+        ),
+    ]
+
+    searchable_trials = [
+        trial
+        for trial in trials
+        if "Processed Similarity" in trial and "Raw Similarity" in trial
+    ]
+    if searchable_trials:
+        strongest_search = max(
+            searchable_trials,
+            key=lambda trial: float(trial.get("Processed Similarity", 0)),
+        )
+        improvement = float(strongest_search.get("Processed Similarity", 0)) - float(
+            strongest_search.get("Raw Similarity", 0)
+        )
+        direction = "increased" if improvement >= 0 else "changed"
+        analysis.append(
+            f"For the top processed result in Trial {strongest_search.get('Trial #', '—')} "
+            f"({strongest_search.get('Top Search Result', '—')}), similarity {direction} from "
+            f"{float(strongest_search.get('Raw Similarity', 0)):.4f} to "
+            f"{float(strongest_search.get('Processed Similarity', 0)):.4f}."
+        )
+        analysis.append(
+            f"The corpus was converted from {strongest_search.get('Raw Vocabulary', '—')} raw terms "
+            f"to {strongest_search.get('Processed Vocabulary', '—')} indexed terms across "
+            f"{strongest_search.get('Indexed Documents', '—')} documents."
+        )
+
+    conclusion = (
+        "The experiment successfully applied normalization, tokenization, stop-word handling, "
+        "and word-form reduction. The recorded results show that preprocessing reduced surface "
+        "variation and produced a compact, consistent vocabulary. The resulting corpus and "
+        "inverted index are suitable for efficient document searching, indexing, and further "
+        "text analysis."
+    )
+    return analysis, conclusion
+
+
+def make_trial_comparison_figure(trials: list[dict]) -> go.Figure:
+    """Compare input/final token counts and reduction across recorded trials."""
+    labels = [f"Trial {trial.get('Trial #', index)}" for index, trial in enumerate(trials, start=1)]
+    figure = go.Figure()
+    figure.add_trace(
+        go.Bar(
+            name="Input Tokens",
+            x=labels,
+            y=[trial.get("Input Tokens", 0) for trial in trials],
+            marker_color="#94a3b8",
+        )
+    )
+    figure.add_trace(
+        go.Bar(
+            name="Final Tokens",
+            x=labels,
+            y=[trial.get("Final Tokens", 0) for trial in trials],
+            marker_color="#2563eb",
+        )
+    )
+    figure.update_layout(
+        title="Trial Comparison: Input vs Final Tokens",
+        xaxis_title="Recorded Trial",
+        yaxis_title="Number of Tokens",
+        barmode="group",
+        height=360,
+        margin={"l": 20, "r": 20, "t": 55, "b": 20},
+    )
+    return figure
+
+
 class LabReportPDF(FPDF):
     def footer(self) -> None:
         self.set_y(-15)
@@ -603,12 +712,75 @@ def pdf_safe(value: object) -> str:
     return str(value).encode("latin-1", "replace").decode("latin-1")
 
 
+def pdf_section_title(pdf: LabReportPDF, number: int, title: str) -> None:
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(30, 64, 175)
+    pdf.cell(0, 7, f"{number}. {title}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(31, 41, 55)
+
+
+def draw_pdf_trial_chart(pdf: LabReportPDF, trials: list[dict]) -> None:
+    """Draw a dependency-free grouped bar chart directly in the PDF."""
+    if not trials:
+        return
+    chart_trials = trials[:8]
+    max_tokens = max(
+        max(float(trial.get("Input Tokens", 0)), float(trial.get("Final Tokens", 0)))
+        for trial in chart_trials
+    ) or 1
+    chart_x = 24
+    chart_y = pdf.get_y() + 5
+    chart_width = 160
+    chart_height = 45
+    group_width = chart_width / len(chart_trials)
+
+    pdf.set_draw_color(148, 163, 184)
+    pdf.line(chart_x, chart_y, chart_x, chart_y + chart_height)
+    pdf.line(chart_x, chart_y + chart_height, chart_x + chart_width, chart_y + chart_height)
+
+    for index, trial in enumerate(chart_trials):
+        input_value = float(trial.get("Input Tokens", 0))
+        final_value = float(trial.get("Final Tokens", 0))
+        input_height = input_value / max_tokens * (chart_height - 5)
+        final_height = final_value / max_tokens * (chart_height - 5)
+        group_x = chart_x + index * group_width + group_width * 0.18
+        bar_width = max(3, group_width * 0.25)
+
+        pdf.set_fill_color(148, 163, 184)
+        pdf.rect(group_x, chart_y + chart_height - input_height, bar_width, input_height, "F")
+        pdf.set_fill_color(37, 99, 235)
+        pdf.rect(
+            group_x + bar_width + 1,
+            chart_y + chart_height - final_height,
+            bar_width,
+            final_height,
+            "F",
+        )
+        pdf.set_xy(group_x - 1, chart_y + chart_height + 1)
+        pdf.set_font("Helvetica", "", 7)
+        pdf.cell(group_width * 0.8, 4, f"T{trial.get('Trial #', index + 1)}", align="C")
+
+    pdf.set_xy(chart_x, chart_y + chart_height + 8)
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_fill_color(148, 163, 184)
+    pdf.rect(chart_x, pdf.get_y() + 1, 3, 3, "F")
+    pdf.cell(5, 5, "")
+    pdf.cell(28, 5, "Input tokens")
+    pdf.set_fill_color(37, 99, 235)
+    pdf.rect(chart_x + 36, pdf.get_y() + 1, 3, 3, "F")
+    pdf.cell(5, 5, "")
+    pdf.cell(28, 5, "Final tokens", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_y(chart_y + chart_height + 15)
+
+
 def generate_pdf_report(
     student_name: str,
     roll_number: str,
     experiment_date: str,
     trials: list[dict],
     notes: str,
+    quiz_score: int = 0,
 ) -> bytes:
     pdf = LabReportPDF()
     pdf.alias_nb_pages()
@@ -627,7 +799,7 @@ def generate_pdf_report(
     pdf.cell(
         0,
         6,
-        pdf_safe(f"Quiz score: {st.session_state['quiz_score']}/{len(QUIZ_QUESTIONS)}"),
+        pdf_safe(f"Quiz score: {quiz_score}/{len(QUIZ_QUESTIONS)}"),
         new_x="LMARGIN",
         new_y="NEXT",
     )
@@ -640,64 +812,96 @@ def generate_pdf_report(
     pdf.set_text_color(31, 41, 55)
     pdf.multi_cell(0, 5, pdf_safe(EXPERIMENT["aim"]), new_x="LMARGIN", new_y="NEXT")
 
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(30, 64, 175)
-    pdf.cell(0, 7, "2. Recorded Experimental Trials", new_x="LMARGIN", new_y="NEXT")
+    pdf_section_title(pdf, 2, "Methodology / Operations Performed")
+    pdf.set_font("Helvetica", "", 9)
+    methodology = [
+        "The input corpus was normalized using the selected case, contraction, accent, punctuation, and number settings.",
+        "The normalized text was tokenized and optional stop words were removed.",
+        "Stemming, lemmatization, or no morphology was applied according to each trial configuration.",
+        "The cleaned corpus was used to build an inverted index and compare raw versus processed search similarity.",
+    ]
+    for step_number, step in enumerate(methodology, start=1):
+        pdf.multi_cell(
+            0,
+            5,
+            pdf_safe(f"{step_number}. {step}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+    pdf_section_title(pdf, 3, "Experimental Results")
     pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(31, 41, 55)
     if not trials:
         pdf.multi_cell(0, 5, "No trials were recorded.", new_x="LMARGIN", new_y="NEXT")
     for trial in trials:
         summary = (
-            f"Trial {trial['Trial #']}: {trial['Configuration']} | "
-            f"tokens {trial['Input Tokens']} -> {trial['Final Tokens']} | "
-            f"vocabulary {trial['Vocabulary']} | reduction {trial['Reduction (%)']}%"
+            f"Trial {trial.get('Trial #', '—')}: {trial.get('Configuration', '—')} | "
+            f"tokens {trial.get('Input Tokens', 0)} -> {trial.get('Final Tokens', 0)} | "
+            f"vocabulary {trial.get('Vocabulary', 0)} | "
+            f"reduction {float(trial.get('Reduction (%)', 0)):.2f}%"
         )
         pdf.set_font("Helvetica", "B", 8)
         pdf.multi_cell(0, 5, pdf_safe(summary), new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 8)
+        if "Processed Similarity" in trial:
+            search_summary = (
+                f"Index: {trial.get('Indexed Documents', '—')} documents, "
+                f"{trial.get('Raw Vocabulary', '—')} -> {trial.get('Processed Vocabulary', '—')} terms | "
+                f"Top result: {trial.get('Top Search Result', '—')} | "
+                f"Similarity: {float(trial.get('Raw Similarity', 0)):.4f} -> "
+                f"{float(trial.get('Processed Similarity', 0)):.4f}"
+            )
+            pdf.set_font("Helvetica", "", 8)
+            pdf.multi_cell(0, 5, pdf_safe(search_summary), new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "I", 7)
+        output_preview = str(trial.get("Clean Corpus", ""))[:300]
         pdf.multi_cell(
             0,
-            5,
-            pdf_safe(f"Output: {trial['Clean Corpus']}"),
+            4,
+            pdf_safe(f"Clean corpus preview: {output_preview}"),
             new_x="LMARGIN",
             new_y="NEXT",
         )
         pdf.ln(2)
 
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(30, 64, 175)
-    pdf.cell(0, 7, "3. Observations and Analysis", new_x="LMARGIN", new_y="NEXT")
+    if trials:
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(0, 6, "Trial Comparison Graph", new_x="LMARGIN", new_y="NEXT")
+        draw_pdf_trial_chart(pdf, trials)
+
+    analysis_points, conclusion = build_trial_analysis(trials)
+    pdf_section_title(pdf, 4, "Automatic Comparative Analysis")
     pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(31, 41, 55)
+    for point in analysis_points:
+        pdf.multi_cell(
+            0,
+            5,
+            pdf_safe(f"- {point}"),
+            new_x="LMARGIN",
+            new_y="NEXT",
+        )
+
+    pdf_section_title(pdf, 5, "Student Observations")
+    pdf.set_font("Helvetica", "", 9)
     pdf.multi_cell(
         0,
         5,
-        pdf_safe(notes.strip() or "No observation was entered."),
+        pdf_safe(notes.strip() or "No additional student observation was entered."),
         new_x="LMARGIN",
         new_y="NEXT",
     )
 
-    pdf.ln(3)
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.set_text_color(30, 64, 175)
-    pdf.cell(0, 7, "4. Expected Outcome", new_x="LMARGIN", new_y="NEXT")
+    pdf_section_title(pdf, 6, "Conclusion")
     pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(31, 41, 55)
-    pdf.multi_cell(
-        0,
-        5,
-        pdf_safe(EXPERIMENT["expected_outcome"]),
-        new_x="LMARGIN",
-        new_y="NEXT",
-    )
+    pdf.multi_cell(0, 5, pdf_safe(conclusion), new_x="LMARGIN", new_y="NEXT")
     return bytes(pdf.output())
 
 
 def render_report_section() -> None:
     st.header("Report Generation")
-    st.write("Compile student details, trials, quiz performance, and observations into a PDF report.")
+    st.write(
+        "Generate a complete laboratory report containing the performed methodology, trial results, "
+        "comparison graphs, automatic analysis, student observations, and conclusion."
+    )
 
     name_column, roll_column, date_column = st.columns(3)
     with name_column:
@@ -714,11 +918,11 @@ def render_report_section() -> None:
     }
 
     default_notes = (
-        "Normalization reduced surface-level variation. Stop-word removal reduced token count, "
-        "while lemmatization retained more interpretable base forms than stemming."
+        "I observed that stop-word removal reduced the token count. Lemmatization produced more "
+        "readable base forms, while stemming was faster but sometimes produced incomplete words."
     )
     notes = st.text_area(
-        "Discussion, Observations, and Conclusion",
+        "Student Observations (write what you noticed during the experiment)",
         value=st.session_state["student_notes"] or default_notes,
         height=130,
     )
@@ -738,6 +942,33 @@ def render_report_section() -> None:
         st.warning("Record at least two simulation trials for a meaningful report comparison.")
     else:
         st.dataframe(trial_dataframe, hide_index=True, width="stretch")
+        st.plotly_chart(make_trial_comparison_figure(st.session_state["trials"]), width="stretch")
+
+        reduction_figure = go.Figure(
+            go.Bar(
+                x=[f"Trial {trial.get('Trial #', index)}" for index, trial in enumerate(st.session_state["trials"], start=1)],
+                y=[trial.get("Reduction (%)", 0) for trial in st.session_state["trials"]],
+                marker_color="#16a34a",
+                text=[f"{float(trial.get('Reduction (%)', 0)):.2f}%" for trial in st.session_state["trials"]],
+                textposition="outside",
+            )
+        )
+        reduction_figure.update_layout(
+            title="Token Reduction Achieved in Each Trial",
+            xaxis_title="Recorded Trial",
+            yaxis_title="Reduction (%)",
+            height=330,
+            margin={"l": 20, "r": 20, "t": 55, "b": 20},
+        )
+        st.plotly_chart(reduction_figure, width="stretch")
+
+    analysis_points, conclusion = build_trial_analysis(st.session_state["trials"])
+    st.subheader("Automatic Analysis Preview")
+    for point in analysis_points:
+        st.markdown(f"- {point}")
+
+    st.subheader("Conclusion Preview")
+    st.success(conclusion)
 
     report_bytes = generate_pdf_report(
         student_name,
@@ -745,6 +976,7 @@ def render_report_section() -> None:
         str(experiment_date),
         st.session_state["trials"],
         notes,
+        st.session_state["quiz_score"],
     )
     st.download_button(
         "Download Official Lab Report (.pdf)",
@@ -762,6 +994,8 @@ def render_report_section() -> None:
         "quiz_score": st.session_state["quiz_score"],
         "quiz_total": len(QUIZ_QUESTIONS),
         "notes": notes,
+        "automatic_analysis": analysis_points,
+        "conclusion": conclusion,
     }
     st.download_button(
         "Download Session Data (.json)",
