@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 import json
+import random
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -149,6 +150,246 @@ QUIZ_QUESTIONS = [
         "answer": 2,
         "explanation": "The specified outcome is a standardized corpus for downstream use.",
     },
+        {
+        "id": 11,
+        "question": "Which NLP task separates a paragraph into individual sentences?",
+        "options": [
+            "Sentence segmentation",
+            "Lemmatization",
+            "Stop-word removal",
+            "Index compression",
+        ],
+        "answer": 0,
+        "explanation": "Sentence segmentation identifies sentence boundaries within a text.",
+    },
+    {
+        "id": 12,
+        "question": "What is the main purpose of removing punctuation during preprocessing?",
+        "options": [
+            "To increase the number of tokens",
+            "To reduce unwanted symbols that may interfere with text analysis",
+            "To translate text into another language",
+            "To identify the author",
+        ],
+        "answer": 1,
+        "explanation": "Punctuation removal can standardize text and reduce irrelevant token variations.",
+    },
+    {
+        "id": 13,
+        "question": "Which of the following is an example of a stop word?",
+        "options": [
+            "Database",
+            "Retrieval",
+            "The",
+            "Algorithm",
+        ],
+        "answer": 2,
+        "explanation": "The word 'the' is a common stop word in many NLP pipelines.",
+    },
+    {
+        "id": 14,
+        "question": "What is the purpose of expanding contractions in text?",
+        "options": [
+            "To replace short forms with their full forms",
+            "To remove all vowels",
+            "To convert words into numerical IDs",
+            "To remove every verb",
+        ],
+        "answer": 0,
+        "explanation": "Contraction expansion maps forms such as 'can't' to 'cannot'.",
+    },
+    {
+        "id": 15,
+        "question": "Which preprocessing operation converts 'Café' to 'Cafe'?",
+        "options": [
+            "Tokenization",
+            "Accent removal",
+            "Stemming",
+            "Sentence segmentation",
+        ],
+        "answer": 1,
+        "explanation": "Accent removal strips diacritical marks from characters.",
+    },
+    {
+        "id": 16,
+        "question": "What can happen if numbers are removed indiscriminately from text?",
+        "options": [
+            "All words become lowercase",
+            "Important information such as dates or product IDs may be lost",
+            "Every sentence becomes a question",
+            "The vocabulary always increases",
+        ],
+        "answer": 1,
+        "explanation": "Numbers can carry meaningful information, depending on the task.",
+    },
+    {
+        "id": 17,
+        "question": "Which statement about stemming is correct?",
+        "options": [
+            "It always produces valid dictionary words",
+            "It uses rules to reduce words to stems",
+            "It only removes stop words",
+            "It translates words into their synonyms",
+        ],
+        "answer": 1,
+        "explanation": "Stemming commonly removes prefixes or suffixes and may produce non-dictionary forms.",
+    },
+    {
+        "id": 18,
+        "question": "What is a lemma?",
+        "options": [
+            "A word's punctuation mark",
+            "A word's meaningful base or dictionary form",
+            "A list of stop words",
+            "A document's unique ID",
+        ],
+        "answer": 1,
+        "explanation": "A lemma is the canonical dictionary form of a word.",
+    },
+    {
+        "id": 19,
+        "question": "Which pair demonstrates case folding?",
+        "options": [
+            "running → run",
+            "CLOUD → cloud",
+            "can't → cannot",
+            "Café → Cafe",
+        ],
+        "answer": 1,
+        "explanation": "Case folding converts text to a consistent case, commonly lowercase.",
+    },
+    {
+        "id": 20,
+        "question": "Why is preprocessing important in information retrieval?",
+        "options": [
+            "It guarantees every search result is correct",
+            "It helps standardize queries and documents for matching",
+            "It eliminates the need for an index",
+            "It converts every document into an image",
+        ],
+        "answer": 1,
+        "explanation": "Consistent preprocessing can improve matching between queries and indexed documents.",
+    },
+    {
+        "id": 21,
+        "question": "What does an inverted index store?",
+        "options": [
+            "Each word and the documents in which it appears",
+            "Only the full text of the longest document",
+            "The order in which users visit a website",
+            "A list of grammar rules",
+        ],
+        "answer": 0,
+        "explanation": "An inverted index maps terms to the documents containing them.",
+    },
+    {
+        "id": 22,
+        "question": "What is vocabulary size after preprocessing?",
+        "options": [
+            "The total number of paragraphs",
+            "The number of unique tokens in the processed text",
+            "The number of punctuation marks removed",
+            "The total number of characters in the input",
+        ],
+        "answer": 1,
+        "explanation": "Vocabulary size counts distinct tokens in the processed corpus.",
+    },
+    {
+        "id": 23,
+        "question": "What does token frequency represent?",
+        "options": [
+            "How many times a token occurs",
+            "How many letters a token contains",
+            "How many documents were deleted",
+            "The number of stop-word lists available",
+        ],
+        "answer": 0,
+        "explanation": "Token frequency measures the occurrences of a token in the text.",
+    },
+    {
+        "id": 24,
+        "question": "Which example best illustrates lemmatization?",
+        "options": [
+            "studies → studi",
+            "cars → car",
+            "TEXT → text",
+            "can't → cannot",
+        ],
+        "answer": 1,
+        "explanation": "Lemmatization can map the plural 'cars' to its dictionary form 'car'.",
+    },
+    {
+        "id": 25,
+        "question": "Why should the order of preprocessing steps be considered?",
+        "options": [
+            "The order can affect what information later steps receive",
+            "The order never changes the output",
+            "It determines the computer's screen resolution",
+            "It removes the need for tokenization",
+        ],
+        "answer": 0,
+        "explanation": "Some operations depend on information preserved by earlier steps.",
+    },
+    {
+        "id": 26,
+        "question": "What is a potential disadvantage of aggressive text normalization?",
+        "options": [
+            "It always increases document length",
+            "It may remove distinctions important to the task",
+            "It prevents text from being stored",
+            "It guarantees perfect semantic understanding",
+        ],
+        "answer": 1,
+        "explanation": "Over-normalization can remove meaningful differences or context.",
+    },
+    {
+        "id": 27,
+        "question": "Which task may require keeping the word 'not'?",
+        "options": [
+            "Sentiment analysis",
+            "Removing file extensions",
+            "Counting image pixels",
+            "Sorting documents by filename only",
+        ],
+        "answer": 0,
+        "explanation": "Negation can reverse sentiment, as in 'good' versus 'not good'.",
+    },
+    {
+        "id": 28,
+        "question": "What is a corpus in Natural Language Processing?",
+        "options": [
+            "A collection of text documents",
+            "A single punctuation mark",
+            "A type of computer processor",
+            "A list containing only numbers",
+        ],
+        "answer": 0,
+        "explanation": "A corpus is a collection of text used for linguistic analysis or NLP tasks.",
+    },
+    {
+        "id": 29,
+        "question": "What does a text preprocessing pipeline do?",
+        "options": [
+            "Applies a sequence of text transformation steps",
+            "Only displays raw text without changes",
+            "Converts every document into a video",
+            "Automatically creates a database server",
+        ],
+        "answer": 0,
+        "explanation": "A pipeline applies multiple preprocessing operations in a defined sequence.",
+    },
+    {
+        "id": 30,
+        "question": "Why compare raw and preprocessed search results?",
+        "options": [
+            "To determine whether preprocessing changes matching behavior",
+            "To guarantee that every document is relevant",
+            "To avoid recording experimental results",
+            "To increase the number of spelling mistakes",
+        ],
+        "answer": 0,
+        "explanation": "Comparing results helps reveal how preprocessing affects retrieval and similarity.",
+    },
 ]
 
 
@@ -158,6 +399,7 @@ def initialize_state() -> None:
         "quiz_answers": {},
         "quiz_submitted": False,
         "quiz_score": 0,
+        "quiz_question_set": None,
         "student_info": {"name": "", "roll": "", "date": str(date.today())},
         "student_notes": "",
     }
@@ -557,53 +799,119 @@ def render_simulation_section() -> None:
 
 def render_quiz_section() -> None:
     st.header("Concept Assessment Quiz")
-    st.write("Answer all ten questions and submit the quiz for immediate feedback.")
 
+    st.write(
+        "This quiz contains 10 randomly selected questions "
+        "from a question bank of 30 questions."
+    )
+
+    # Generate the first random quiz when the section is opened
+    if st.session_state["quiz_question_set"] is None:
+        st.session_state["quiz_question_set"] = random.sample(
+            QUIZ_QUESTIONS, 10
+        )
+
+    # Button to generate a fresh quiz attempt
+    if st.button("🎲 New Random Quiz"):
+        st.session_state["quiz_question_set"] = random.sample(
+            QUIZ_QUESTIONS, 10
+        )
+
+        # Reset previous quiz results
+        st.session_state["quiz_answers"] = {}
+        st.session_state["quiz_submitted"] = False
+        st.session_state["quiz_score"] = 0
+
+        # Clear old radio selections
+        for question in QUIZ_QUESTIONS:
+            st.session_state.pop(
+                f"quiz_{question['id']}", None
+            )
+
+    # Retrieve the current 10 questions
+    quiz_questions = st.session_state["quiz_question_set"]
+
+    st.caption(
+        f"Question bank: {len(QUIZ_QUESTIONS)} questions | "
+        f"Current quiz: {len(quiz_questions)} questions"
+    )
+
+    # Display the questions inside a form
     with st.form("concept_quiz"):
         responses = {}
-        for question in QUIZ_QUESTIONS:
-            st.markdown(f"**Question {question['id']}**")
+
+        for index, question in enumerate(quiz_questions, start=1):
+            st.markdown(f"### Question {index} of 10")
             st.write(question["question"])
+
             selected = st.radio(
-                f"Options for Question {question['id']}",
+                f"Options for Question {index}",
                 question["options"],
                 index=None,
                 key=f"quiz_{question['id']}",
                 label_visibility="collapsed",
             )
-            responses[question["id"]] = (
-                question["options"].index(selected) if selected is not None else None
-            )
-        submitted = st.form_submit_button("Submit Quiz for Grading", type="primary")
 
+            responses[question["id"]] = (
+                question["options"].index(selected)
+                if selected is not None
+                else None
+            )
+
+        submitted = st.form_submit_button(
+            "Submit Quiz for Grading",
+            type="primary",
+        )
+
+    # Grade the quiz when submitted
     if submitted:
         score = 0
+
         st.session_state["quiz_answers"] = responses
         st.session_state["quiz_submitted"] = True
+
         st.divider()
         st.subheader("Evaluation Results and Feedback")
 
-        for question in QUIZ_QUESTIONS:
+        for index, question in enumerate(quiz_questions, start=1):
             response = responses[question["id"]]
+
             if response == question["answer"]:
                 score += 1
-                st.success(f"Question {question['id']}: Correct — {question['explanation']}")
+
+                st.success(
+                    f"Question {index}: Correct — "
+                    f"{question['explanation']}"
+                )
+
             elif response is None:
-                st.warning(f"Question {question['id']}: Not answered — {question['explanation']}")
+                st.warning(
+                    f"Question {index}: Not answered — "
+                    f"{question['explanation']}"
+                )
+
             else:
                 correct = question["options"][question["answer"]]
+
                 st.error(
-                    f"Question {question['id']}: Incorrect. Correct answer: {correct}. "
+                    f"Question {index}: Incorrect. "
+                    f"Correct answer: {correct}. "
                     f"{question['explanation']}"
                 )
 
         st.session_state["quiz_score"] = score
-        percentage = score / len(QUIZ_QUESTIONS) * 100
-        st.info(f"Final Score: **{score}/{len(QUIZ_QUESTIONS)} ({percentage:.0f}%)**")
+
+        percentage = score / len(quiz_questions) * 100
+
+        st.info(
+            f"Final Score: **{score}/10 ({percentage:.0f}%)**"
+        )
+
     elif st.session_state["quiz_submitted"]:
         st.info(
-            f"Latest score: {st.session_state['quiz_score']}/{len(QUIZ_QUESTIONS)}. "
-            "Resubmit to record a new score."
+            f"Latest score: "
+            f"{st.session_state['quiz_score']}/10. "
+            "Click New Random Quiz to try again."
         )
 
 
